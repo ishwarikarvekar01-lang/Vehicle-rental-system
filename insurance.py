@@ -1,88 +1,56 @@
 from fastapi import APIRouter, HTTPException
+from database import get_connection
 
-router = APIRouter(
-    prefix="/insurance",
-    tags=["Insurance"]
-)
+router = APIRouter(prefix="/insurance", tags=["Insurance"])
 
-insurance = [
-    {
-        "id": 1,
-        "PolicyNumber": "INS1001",
-        "Provider": "ICICI Lombard",
-        "CoverageAmount": 500000,
-        "ExpiryDate": "2027-12-31"
-    },
-    {
-        "id": 2,
-        "PolicyNumber": "INS1002",
-        "Provider": "HDFC ERGO",
-        "CoverageAmount": 700000,
-        "ExpiryDate": "2028-06-30"
-    },
-    {
-        "id": 3,
-        "PolicyNumber": "INS1003",
-        "Provider": "Bajaj Allianz",
-        "CoverageAmount": 600000,
-        "ExpiryDate": "2027-10-15"
-    }
-]
-
-# GET ALL
 @router.get("/")
 def get_insurance():
-    return insurance
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM insurance")
+    data = cursor.fetchall()
+    conn.close()
+    return data
 
-# GET BY ID
-@router.get("/{insurance_id}")
-def get_insurance_by_id(insurance_id: int):
-    for item in insurance:
-        if item["id"] == insurance_id:
-            return item
-    raise HTTPException(status_code=404, detail="Insurance not found")
+@router.get("/{id}")
+def get_insurance_by_id(id: int):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM insurance WHERE InsuranceID=%s", (id,))
+    data = cursor.fetchone()
+    conn.close()
 
-# POST
+    if not data:
+        raise HTTPException(status_code=404, detail="Insurance not found")
+
+    return data
+
 @router.post("/")
-def add_insurance(item: dict):
-    insurance.append(item)
-    return {
-        "message": "Insurance added successfully",
-        "insurance": item
-    }
+def add_insurance(insurance: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
 
-# PUT
-@router.put("/{insurance_id}")
-def update_insurance(insurance_id: int, item: dict):
-    for i in range(len(insurance)):
-        if insurance[i]["id"] == insurance_id:
-            insurance[i] = item
-            return {
-                "message": "Insurance updated successfully",
-                "insurance": item
-            }
-    raise HTTPException(status_code=404, detail="Insurance updated successfully")
+    sql = """
+    INSERT INTO insurance
+    (PolicyNumber, Provider, CoverageAmount, ExpiryDate)
+    VALUES (%s,%s,%s,%s)
+    """
 
-# PATCH
-@router.patch("/{insurance_id}")
-def patch_insurance(insurance_id: int, update_data: dict):
-    for item in insurance:
-        if item["id"] == insurance_id:
-            item.update(update_data)
-            return {
-                "message": "Insurance updated successfully",
-                "insurance_data":item
-            }
-    raise HTTPException(status_code=404, detail="Insurance partially updated")
+    cursor.execute(sql, tuple(insurance.values()))
+    conn.commit()
+    conn.close()
 
-# DELETE
-@router.delete("/{insurance_id}")
-def delete_insurance(insurance_id: int):
-    for i in range(len(insurance)):
-        if insurance[i]["id"] == insurance_id:
-            deleted = insurance.pop(i)
-            return {
-                "message": "Insurance deleted successfully",
-                "deleted_data":deleted
-            }
-    raise HTTPException(status_code=404, detail="Insurance deleted successfully")
+    return {"message": "Insurance added successfully"}
+
+@router.put("/{id}")
+def update_insurance(id: int, insurance: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    sql = """
+    UPDATE insurance
+    SET PolicyNumber=%s,
+        Provider=%s,
+        CoverageAmount=%s,
+        ExpiryDate=%s
+    WHERE InsuranceID=%
