@@ -1,88 +1,45 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
+from database import get_connection
 
-router = APIRouter(
-    prefix="/payments",
-    tags=["Payments"]
-)
+router=APIRouter(prefix="/payments",tags=["Payments"])
 
-payments = [
-    {
-        "id": 1,
-        "BookingID": 1,
-        "PaymentMethod": "Credit Card",
-        "Amount": 5000,
-        "PaymentStatus": "Paid"
-    },
-    {
-        "id": 2,
-        "BookingID": 2,
-        "PaymentMethod": "UPI",
-        "Amount": 3500,
-        "PaymentStatus": "Pending"
-    },
-    {
-        "id": 3,
-        "BookingID": 3,
-        "PaymentMethod": "Cash",
-        "Amount": 4200,
-        "PaymentStatus": "Paid"
-    }
-]
-
-# GET ALL
 @router.get("/")
 def get_payments():
-    return payments
+    conn=get_connection()
+    cursor=conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM payments")
+    data=cursor.fetchall()
+    conn.close()
+    return data
 
-# GET BY ID
-@router.get("/{payment_id}")
-def get_payment(payment_id: int):
-    for payment in payments:
-        if payment["id"] == payment_id:
-            return payment
-    raise HTTPException(status_code=404, detail="Payment not found")
-
-# POST
 @router.post("/")
-def add_payment(payment: dict):
-    payments.append(payment)
-    return {
-        "message": "Payment added successfully",
-        "payment": payment
-    }
+def add_payment(payment:dict):
+    conn=get_connection()
+    cursor=conn.cursor()
+    sql="""INSERT INTO payments(BookingID,PaymentMethod,PaymentDate,Amount,PaymentStatus)
+    VALUES(%s,%s,%s,%s,%s)"""
+    cursor.execute(sql,tuple(payment.values()))
+    conn.commit()
+    conn.close()
+    return {"message":"Payment added"}
 
-# PUT
-@router.put("/{payment_id}")
-def update_payment(payment_id: int, payment: dict):
-    for i in range(len(payments)):
-        if payments[i]["id"] == payment_id:
-            payments[i] = payment
-            return {
-                "message": "Payment updated successfully",
-                "payment": payment
-            }
-    raise HTTPException(status_code=404, detail="Payment updated successfully")
+@router.put("/{id}")
+def update_payment(id:int,payment:dict):
+    conn=get_connection()
+    cursor=conn.cursor()
+    sql="""UPDATE payments SET BookingID=%s,PaymentMethod=%s,
+    PaymentDate=%s,Amount=%s,PaymentStatus=%s
+    WHERE PaymentID=%s"""
+    cursor.execute(sql,(*payment.values(),id))
+    conn.commit()
+    conn.close()
+    return {"message":"Payment updated"}
 
-# PATCH
-@router.patch("/{payment_id}")
-def patch_payment(payment_id: int, update_data: dict):
-    for payment in payments:
-        if payment["id"] == payment_id:
-            payment.update(update_data)
-            return {
-                "message": "Payment partially updated",
-                "payment": payment
-            }
-    raise HTTPException(status_code=404, detail="Payment updated partially")
-
-# DELETE
-@router.delete("/{payment_id}")
-def delete_payment(payment_id: int):
-    for i in range(len(payments)):
-        if payments[i]["id"] == payment_id:
-            deleted = payments.pop(i)
-            return {
-                "message": "Payment deleted successfully",
-                "payment": deleted
-            }
-    raise HTTPException(status_code=404, detail="Payment deleted successfully")
+@router.delete("/{id}")
+def delete_payment(id:int):
+    conn=get_connection()
+    cursor=conn.cursor()
+    cursor.execute("DELETE FROM payments WHERE PaymentID=%s",(id,))
+    conn.commit()
+    conn.close()
+    return {"message":"Payment deleted"}
