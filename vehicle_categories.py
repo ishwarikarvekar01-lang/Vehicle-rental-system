@@ -1,85 +1,42 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
+from database import get_connection
 
-router = APIRouter(
-    prefix="/vehicle_categories",
-    tags=["Vehicle Categories"]
-)
+router=APIRouter(prefix="/vehiclecategories",tags=["Vehicle Categories"])
 
-vehicle_categories = [
-    {
-        "id": 1,
-        "CategoryName": "Car",
-        "SeatingCapacity": 5,
-        "Description": "Comfortable family car"
-    },
-    {
-        "id": 2,
-        "CategoryName": "Bike",
-        "SeatingCapacity": 2,
-        "Description": "Two wheeler for city travel"
-    },
-    {
-        "id": 3,
-        "CategoryName": "SUV",
-        "SeatingCapacity": 7,
-        "Description": "Spacious sports utility vehicle"
-    }
-]
-
-# GET ALL
 @router.get("/")
-def get_vehicle_categories():
-    return vehicle_categories
+def get_categories():
+    conn=get_connection()
+    cursor=conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM vehiclecategories")
+    data=cursor.fetchall()
+    conn.close()
+    return data
 
-# GET BY ID
-@router.get("/{category_id}")
-def get_vehicle_category(category_id: int):
-    for category in vehicle_categories:
-        if category["id"] == category_id:
-            return category
-    raise HTTPException(status_code=404, detail="Vehicle Category not found")
-
-# POST
 @router.post("/")
-def add_vehicle_category(category: dict):
-    vehicle_categories.append(category)
-    return {
-        "message": "Vehicle Category added successfully",
-        "vehicle_category": category
-    }
+def add_category(category:dict):
+    conn=get_connection()
+    cursor=conn.cursor()
+    sql="INSERT INTO vehiclecategories(CategoryName,SeatingCapacity,Description) VALUES(%s,%s,%s)"
+    cursor.execute(sql,tuple(category.values()))
+    conn.commit()
+    conn.close()
+    return {"message":"Category added"}
 
-# PUT
-@router.put("/{category_id}")
-def update_vehicle_category(category_id: int, category: dict):
-    for i in range(len(vehicle_categories)):
-        if vehicle_categories[i]["id"] == category_id:
-            vehicle_categories[i] = category
-            return {
-                "message": "Vehicle Category updated successfully",
-                "vehicle_category": category
-            }
-    raise HTTPException(status_code=404, detail="Vehicle Category not found")
+@router.put("/{id}")
+def update_category(id:int,category:dict):
+    conn=get_connection()
+    cursor=conn.cursor()
+    sql="UPDATE vehiclecategories SET CategoryName=%s,SeatingCapacity=%s,Description=%s WHERE CategoryID=%s"
+    cursor.execute(sql,(*category.values(),id))
+    conn.commit()
+    conn.close()
+    return {"message":"Category updated"}
 
-# PATCH
-@router.patch("/{category_id}")
-def patch_vehicle_category(category_id: int, update_data: dict):
-    for category in vehicle_categories:
-        if category["id"] == category_id:
-            category.update(update_data)
-            return {
-                "message": "Vehicle Category partially updated",
-                "vehicle_category": category
-            }
-    raise HTTPException(status_code=404, detail="Updated Partially")
-
-# DELETE
-@router.delete("/{category_id}")
-def delete_vehicle_category(category_id: int):
-    for i in range(len(vehicle_categories)):
-        if vehicle_categories[i]["id"] == category_id:
-            deleted = vehicle_categories.pop(i)
-            return {
-                "message": "Vehicle Category deleted successfully",
-                "vehicle_category": deleted
-            }
-    raise HTTPException(status_code=404, detail="Vehicle deleted successfully")
+@router.delete("/{id}")
+def delete_category(id:int):
+    conn=get_connection()
+    cursor=conn.cursor()
+    cursor.execute("DELETE FROM vehiclecategories WHERE CategoryID=%s",(id,))
+    conn.commit()
+    conn.close()
+    return {"message":"Category deleted"}
