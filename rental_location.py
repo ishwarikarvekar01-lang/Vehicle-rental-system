@@ -1,88 +1,42 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
+from database import get_connection
 
-router = APIRouter(
-    prefix="/rental_locations",
-    tags=["Rental Locations"]
-)
+router=APIRouter(prefix="/rentallocations",tags=["Rental Locations"])
 
-rental_locations = [
-    {
-        "id": 1,
-        "LocationName": "Panaji Branch",
-        "City": "Panaji",
-        "State": "Goa",
-        "Pincode": "403001"
-    },
-    {
-        "id": 2,
-        "LocationName": "Margao Branch",
-        "City": "Margao",
-        "State": "Goa",
-        "Pincode": "403601"
-    },
-    {
-        "id": 3,
-        "LocationName": "Mapusa Branch",
-        "City": "Mapusa",
-        "State": "Goa",
-        "Pincode": "403507"
-    }
-]
-
-# GET ALL
 @router.get("/")
-def get_rental_locations():
-    return rental_locations
+def get_locations():
+    conn=get_connection()
+    cursor=conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM rentallocations")
+    data=cursor.fetchall()
+    conn.close()
+    return data
 
-# GET BY ID
-@router.get("/{location_id}")
-def get_rental_location(location_id: int):
-    for location in rental_locations:
-        if location["id"] == location_id:
-            return location
-    raise HTTPException(status_code=404, detail="Rental Location not found")
-
-# POST
 @router.post("/")
-def add_rental_location(location: dict):
-    rental_locations.append(location)
-    return {
-        "message": "Rental Location added successfully",
-        "rental_location": location
-    }
+def add_location(location:dict):
+    conn=get_connection()
+    cursor=conn.cursor()
+    sql="INSERT INTO rentallocations(LocationName,City,State,Pincode) VALUES(%s,%s,%s,%s)"
+    cursor.execute(sql,tuple(location.values()))
+    conn.commit()
+    conn.close()
+    return {"message":"Location added"}
 
-# PUT
-@router.put("/{location_id}")
-def update_rental_location(location_id: int, location: dict):
-    for i in range(len(rental_locations)):
-        if rental_locations[i]["id"] == location_id:
-            rental_locations[i] = location
-            return {
-                "message": "Rental Location updated successfully",
-                "rental_location": location
-            }
-    raise HTTPException(status_code=404, detail="Rental Location updated successfully")
+@router.put("/{id}")
+def update_location(id:int,location:dict):
+    conn=get_connection()
+    cursor=conn.cursor()
+    sql="UPDATE rentallocations SET LocationName=%s,City=%s,State=%s,Pincode=%s WHERE LocationID=%s"
+    cursor.execute(sql,(*location.values(),id))
+    conn.commit()
+    conn.close()
+    return {"message":"Location updated"}
 
-# PATCH
-@router.patch("/{location_id}")
-def patch_rental_location(location_id: int, update_data: dict):
-    for location in rental_locations:
-        if location["id"] == location_id:
-            location.update(update_data)
-            return {
-                "message": "Rental Location partially updated",
-                "updated_data": location
-            }
-    raise HTTPException(status_code=404, detail="Rental Location partially updated")
-
-# DELETE
-@router.delete("/{location_id}")
-def delete_rental_location(location_id: int):
-    for i in range(len(rental_locations)):
-        if rental_locations[i]["id"] == location_id:
-            deleted = rental_locations.pop(i)
-            return {
-                "message": "Rental Location deleted successfully",
-                "deleted_data": deleted
-            }
-    raise HTTPException(status_code=404, detail="Rental Location deleted successfully")
+@router.delete("/{id}")
+def delete_location(id:int):
+    conn=get_connection()
+    cursor=conn.cursor()
+    cursor.execute("DELETE FROM rentallocations WHERE LocationID=%s",(id,))
+    conn.commit()
+    conn.close()
+    return {"message":"Location deleted"}
