@@ -1,88 +1,76 @@
 from fastapi import APIRouter, HTTPException
+from database import get_connection
 
-router = APIRouter(
-    prefix="/reviews",
-    tags=["Reviews"]
-)
+router = APIRouter(prefix="/reviews", tags=["Reviews"])
 
-reviews = [
-    {
-        "id": 1,
-        "UserName": "Rahul",
-        "VehicleName": "Hyundai Creta",
-        "Rating": 5,
-        "Comment": "Excellent service"
-    },
-    {
-        "id": 2,
-        "UserName": "Priya",
-        "VehicleName": "Honda City",
-        "Rating": 4,
-        "Comment": "Good experience"
-    },
-    {
-        "id": 3,
-        "UserName": "Amit",
-        "VehicleName": "Kia Seltos",
-        "Rating": 3,
-        "Comment": "Average service"
-    }
-]
-
-# GET ALL
 @router.get("/")
 def get_reviews():
-    return reviews
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM reviews")
+    data = cursor.fetchall()
+    conn.close()
+    return data
 
-# GET BY ID
-@router.get("/{review_id}")
-def get_review(review_id: int):
-    for review in reviews:
-        if review["id"] == review_id:
-            return review
-    raise HTTPException(status_code=404, detail="Review added")
+@router.get("/{id}")
+def get_review(id: int):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
 
-# POST
+    cursor.execute("SELECT * FROM reviews WHERE ReviewID=%s", (id,))
+    data = cursor.fetchone()
+    conn.close()
+
+    if not data:
+        raise HTTPException(status_code=404, detail="Review not found")
+
+    return data
+
 @router.post("/")
 def add_review(review: dict):
-    reviews.append(review)
-    return {
-        "message": "Review added successfully",
-        "review": review
-    }
+    conn = get_connection()
+    cursor = conn.cursor()
 
-# PUT
-@router.put("/{review_id}")
-def update_review(review_id: int, review: dict):
-    for i in range(len(reviews)):
-        if reviews[i]["id"] == review_id:
-            reviews[i] = review
-            return {
-                "message": "Review updated successfully",
-                "updated_review": review
-            }
-    raise HTTPException(status_code=404, detail="Review updated successfully")
+    sql = """
+    INSERT INTO reviews
+    (UserID, VehicleID, Rating, Comment, ReviewDate)
+    VALUES (%s,%s,%s,%s,%s)
+    """
 
-# PATCH
-@router.patch("/{review_id}")
-def patch_review(review_id: int, update_data: dict):
-    for review in reviews:
-        if review["id"] == review_id:
-            review.update(update_data)
-            return {
-                "message": "Review updated successfully",
-                "updated_data": review
-            }
-    raise HTTPException(status_code=404, detail="Review updated partially")
+    cursor.execute(sql, tuple(review.values()))
+    conn.commit()
+    conn.close()
 
-# DELETE
-@router.delete("/{review_id}")
-def delete_review(review_id: int):
-    for i in range(len(reviews)):
-        if reviews[i]["id"] == review_id:
-            deleted = reviews.pop(i)
-            return {
-                "message": "Review deleted successfully",
-                "deleted_data": deleted
-            }
-    raise HTTPException(status_code=404, detail="Review deleted successfully")
+    return {"message": "Review added successfully"}
+
+@router.put("/{id}")
+def update_review(id: int, review: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    sql = """
+    UPDATE reviews
+    SET UserID=%s,
+        VehicleID=%s,
+        Rating=%s,
+        Comment=%s,
+        ReviewDate=%s
+    WHERE ReviewID=%s
+    """
+
+    cursor.execute(sql, (*review.values(), id))
+    conn.commit()
+    conn.close()
+
+    return {"message": "Review updated successfully"}
+
+@router.delete("/{id}")
+def delete_review(id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM reviews WHERE ReviewID=%s", (id,))
+    conn.commit()
+    conn.close()
+
+    return {"message": "Review deleted successfully"}
