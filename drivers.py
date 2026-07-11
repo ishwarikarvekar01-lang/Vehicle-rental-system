@@ -1,88 +1,45 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
+from database import get_connection
 
-router = APIRouter(
-    prefix="/drivers",
-    tags=["Drivers"]
-)
+router=APIRouter(prefix="/drivers",tags=["Drivers"])
 
-drivers = [
-    {
-        "id": 1,
-        "DriverName": "Ramesh Kumar",
-        "LicenseNumber": "DL123456",
-        "Phone": "9876543210",
-        "Experience": 5
-    },
-    {
-        "id": 2,
-        "DriverName": "Suresh Patil",
-        "LicenseNumber": "DL654321",
-        "Phone": "9876501234",
-        "Experience": 8
-    },
-    {
-        "id": 3,
-        "DriverName": "Mahesh Sharma",
-        "LicenseNumber": "DL987654",
-        "Phone": "9876512345",
-        "Experience": 3
-    }
-]
-
-# GET ALL
 @router.get("/")
 def get_drivers():
-    return drivers
+    conn=get_connection()
+    cursor=conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM drivers")
+    data=cursor.fetchall()
+    conn.close()
+    return data
 
-# GET BY ID
-@router.get("/{driver_id}")
-def get_driver(driver_id: int):
-    for driver in drivers:
-        if driver["id"] == driver_id:
-            return driver
-    raise HTTPException(status_code=404, detail="Driver not found")
-
-# POST
 @router.post("/")
-def add_driver(driver: dict):
-    drivers.append(driver)
-    return {
-        "message": "Driver added successfully",
-        "driver": driver
-    }
+def add_driver(driver:dict):
+    conn=get_connection()
+    cursor=conn.cursor()
+    sql="""INSERT INTO drivers(DriverName,Phone,LicenseNumber,Experience,AvailabilityStatus)
+    VALUES(%s,%s,%s,%s,%s)"""
+    cursor.execute(sql,tuple(driver.values()))
+    conn.commit()
+    conn.close()
+    return {"message":"Driver added"}
 
-# PUT
-@router.put("/{driver_id}")
-def update_driver(driver_id: int, driver: dict):
-    for i in range(len(drivers)):
-        if drivers[i]["id"] == driver_id:
-            drivers[i] = driver
-            return {
-                "message": "Driver updated successfully",
-                "driver": driver
-            }
-    raise HTTPException(status_code=404, detail="Driver added successfully")
+@router.put("/{id}")
+def update_driver(id:int,driver:dict):
+    conn=get_connection()
+    cursor=conn.cursor()
+    sql="""UPDATE drivers SET DriverName=%s,Phone=%s,
+    LicenseNumber=%s,Experience=%s,
+    AvailabilityStatus=%s WHERE DriverID=%s"""
+    cursor.execute(sql,(*driver.values(),id))
+    conn.commit()
+    conn.close()
+    return {"message":"Driver updated"}
 
-# PATCH
-@router.patch("/{driver_id}")
-def patch_driver(driver_id: int, update_data: dict):
-    for driver in drivers:
-        if driver["id"] == driver_id:
-            driver.update(update_data)
-            return {
-                "message": "Driver partially updated",
-                "driver": driver
-            }
-    raise HTTPException(status_code=404, detail="Driver partially updated")
-
-# DELETE
-@router.delete("/{driver_id}")
-def delete_driver(driver_id: int):
-    for i in range(len(drivers)):
-        if drivers[i]["id"] == driver_id:
-            deleted = drivers.pop(i)
-            return {
-                "message": "Driver deleted successfully",
-                "driver": deleted
-            }
-    raise HTTPException(status_code=404, detail="Driver deleted successfully")
+@router.delete("/{id}")
+def delete_driver(id:int):
+    conn=get_connection()
+    cursor=conn.cursor()
+    cursor.execute("DELETE FROM drivers WHERE DriverID=%s",(id,))
+    conn.commit()
+    conn.close()
+    return {"message":"Driver deleted"}
