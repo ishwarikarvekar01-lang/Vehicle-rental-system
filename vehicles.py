@@ -1,77 +1,56 @@
 from fastapi import APIRouter, HTTPException
+from database import get_connection
 
-router = APIRouter(
-    prefix="/vehicles",
-    tags=["Vehicles"]
-)
+router = APIRouter(prefix="/vehicles", tags=["Vehicles"])
 
-vehicles = [
-    {
-        "id": 1,
-        "CategoryID": 101,
-        "Brand": "Toyota",
-        "Model": "Innova",
-        "RegistrationNumber": "GA01AB1234",
-        "FuelType": "Diesel",
-        "RentPerDay": 2500,
-        "AvailabilityStatus": "Available"
-    }
-]
-
-# GET ALL
 @router.get("/")
 def get_vehicles():
-    return vehicles
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM vehicles")
+    data = cursor.fetchall()
+    conn.close()
+    return data
 
-# GET BY ID
-@router.get("/{vehicle_id}")
-def get_vehicle(vehicle_id: int):
-    for vehicle in vehicles:
-        if vehicle["id"] == vehicle_id:
-            return vehicle
-    raise HTTPException(status_code=404, detail="Vehicle deleted")
+@router.get("/{id}")
+def get_vehicle(id:int):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM vehicles WHERE VehicleID=%s",(id,))
+    data = cursor.fetchone()
+    conn.close()
+    if not data:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    return data
 
-# POST
 @router.post("/")
-def add_vehicle(vehicle: dict):
-    vehicles.append(vehicle)
-    return {
-        "message": "Vehicle added successfully",
-        "vehicle": vehicle
-    }
+def add_vehicle(vehicle:dict):
+    conn=get_connection()
+    cursor=conn.cursor()
+    sql="""INSERT INTO vehicles(CategoryID,Brand,Model,RegistrationNumber,FuelType,RentPerDay,AvailabilityStatus)
+    VALUES(%s,%s,%s,%s,%s,%s,%s)"""
+    cursor.execute(sql,tuple(vehicle.values()))
+    conn.commit()
+    conn.close()
+    return {"message":"Vehicle added"}
 
-# PUT
-@router.put("/{vehicle_id}")
-def update_vehicle(vehicle_id: int, vehicle: dict):
-    for i in range(len(vehicles)):
-        if vehicles[i]["id"] == vehicle_id:
-            vehicles[i] = vehicle
-            return {
-                "message": "Vehicle updated successfully",
-                "vehicle": vehicle
-            }
-    raise HTTPException(status_code=404, detail="Vehicle not found")
+@router.put("/{id}")
+def update_vehicle(id:int,vehicle:dict):
+    conn=get_connection()
+    cursor=conn.cursor()
+    sql="""UPDATE vehicles SET CategoryID=%s,Brand=%s,Model=%s,
+    RegistrationNumber=%s,FuelType=%s,RentPerDay=%s,
+    AvailabilityStatus=%s WHERE VehicleID=%s"""
+    cursor.execute(sql,(*vehicle.values(),id))
+    conn.commit()
+    conn.close()
+    return {"message":"Vehicle updated"}
 
-# PATCH
-@router.patch("/{vehicle_id}")
-def patch_vehicle(vehicle_id: int, update_data: dict):
-    for vehicle in vehicles:
-        if vehicle["id"] == vehicle_id:
-            vehicle.update(update_data)
-            return {
-                "message": "Vehicle partially updated",
-                "vehicle": vehicle
-            }
-    raise HTTPException(status_code=404, detail="Vehicle not found")
-
-# DELETE
-@router.delete("/{vehicle_id}")
-def delete_vehicle(vehicle_id: int):
-    for i in range(len(vehicles)):
-        if vehicles[i]["id"] == vehicle_id:
-            deleted = vehicles.pop(i)
-            return {
-                "message": "Vehicle deleted successfully",
-                "vehicle": deleted
-            }
-    raise HTTPException(status_code=404, detail="Vehicle not found")
+@router.delete("/{id}")
+def delete_vehicle(id:int):
+    conn=get_connection()
+    cursor=conn.cursor()
+    cursor.execute("DELETE FROM vehicles WHERE VehicleID=%s",(id,))
+    conn.commit()
+    conn.close()
+    return {"message":"Vehicle deleted"}
